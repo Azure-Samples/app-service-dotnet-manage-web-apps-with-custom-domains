@@ -6,14 +6,14 @@ author: jianghaolu
 
 #Getting Started with App - Manage Web App With Domain Ssl - in .Net #
 
-      Azure App Service sample for managing web apps.
-       - app service plan, web app
-         - Create 2 web apps under the same new app service plan
-       - domain
-         - Create a domain
-       - certificate
-         - Upload a self-signed wildcard certificate
-         - update both web apps to use the domain and the created wildcard SSL certificate
+          Azure App Service sample for managing web apps.
+           - app service plan, web app
+             - Create 2 web apps under the same new app service plan
+           - domain
+             - Create a domain
+           - certificate
+             - Upload a self-signed wildcard certificate
+             - update both web apps to use the domain and the created wildcard SSL certificate
 
 
 ## Running this Sample ##
