@@ -4,7 +4,7 @@ platforms: .Net
 author: jianghaolu
 ---
 
-#Getting Started with App - Manage Web App With Domain Ssl - in .Net #
+# Getting Started with App - Manage Web App With Domain Ssl - in .Net #
 
           Azure App Service sample for managing web apps.
            - app service plan, web app

@@ -4,11 +4,11 @@
 using Microsoft.Azure.Management.AppService.Fluent;
 using Microsoft.Azure.Management.AppService.Fluent.Models;
 using Microsoft.Azure.Management.Fluent;
-using Microsoft.Azure.Management.Resource.Fluent;
-using Microsoft.Azure.Management.Resource.Fluent.Core;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.Samples.Common;
 using System;
-using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 
 namespace ManageWebAppWithDomainSsl
@@ -31,7 +31,6 @@ namespace ManageWebAppWithDomainSsl
         {
             string app1Name = SdkContext.RandomResourceName("webapp1-", 20);
             string app2Name = SdkContext.RandomResourceName("webapp2-", 20);
-            string planName = SdkContext.RandomResourceName("jplan_", 15);
             string rgName = SdkContext.RandomResourceName("rgNEMV_", 24);
             string domainName = SdkContext.RandomResourceName("jsdkdemo-", 20) + ".com";
 
@@ -44,10 +43,9 @@ namespace ManageWebAppWithDomainSsl
 
                 var app1 = azure.WebApps
                         .Define(app1Name)
-                        .WithNewResourceGroup(rgName)
-                        .WithNewAppServicePlan(planName)
                         .WithRegion(Region.USWest)
-                        .WithPricingTier(AppServicePricingTier.StandardS1)
+                        .WithNewResourceGroup(rgName)
+                        .WithNewWindowsPlan(PricingTier.StandardS1)
                         .Create();
 
                 Utilities.Log("Created web app " + app1.Name);
@@ -57,11 +55,11 @@ namespace ManageWebAppWithDomainSsl
                 // Create a second web app with the same app service plan
 
                 Utilities.Log("Creating another web app " + app2Name + "...");
-                var plan = azure.AppServices.AppServicePlans.GetByGroup(rgName, planName);
+                var plan = azure.AppServices.AppServicePlans.GetById(app1.AppServicePlanId);
                 var app2 = azure.WebApps
                         .Define(app2Name)
+                        .WithExistingWindowsPlan(plan)
                         .WithExistingResourceGroup(rgName)
-                        .WithExistingAppServicePlan(plan)
                         .Create();
 
                 Utilities.Log("Created web app " + app2.Name);
@@ -115,7 +113,7 @@ namespace ManageWebAppWithDomainSsl
 
                 Utilities.Log("Creating a self-signed certificate " + pfxPath + "...");
 
-                CreateCertificate(domainName, pfxPath, CertificatePassword);
+                Utilities.CreateCertificate(domainName, pfxPath, CertificatePassword);
 
                 Utilities.Log("Created self-signed certificate " + pfxPath);
 
@@ -128,7 +126,7 @@ namespace ManageWebAppWithDomainSsl
                                 .WithManagedHostnameBindings(domain, app1Name)
                                 .DefineSslBinding()
                                     .ForHostname(app1Name + "." + domainName)
-                                    .WithPfxCertificateToUpload("Asset/" + pfxPath, CertificatePassword)
+                                    .WithPfxCertificateToUpload(Path.Combine(Utilities.ProjectPath, "Asset", pfxPath), CertificatePassword)
                                     .WithSniBasedSsl()
                                     .Attach()
                                 .Apply();
@@ -142,7 +140,7 @@ namespace ManageWebAppWithDomainSsl
                                 .WithManagedHostnameBindings(domain, app2Name)
                                 .DefineSslBinding()
                                     .ForHostname(app2Name + "." + domainName)
-                                    .WithPfxCertificateToUpload("Asset/" + pfxPath, CertificatePassword)
+                                    .WithPfxCertificateToUpload(Path.Combine(Utilities.ProjectPath, "Asset", pfxPath), CertificatePassword)
                                     .WithSniBasedSsl()
                                     .Attach()
                                 .Apply();
@@ -179,7 +177,7 @@ namespace ManageWebAppWithDomainSsl
 
                 var azure = Azure
                     .Configure()
-                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.BASIC)
+                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                     .Authenticate(credentials)
                     .WithDefaultSubscription();
 
@@ -192,22 +190,6 @@ namespace ManageWebAppWithDomainSsl
             {
                 Utilities.Log(e);
             }
-        }
-
-        private static HttpResponseMessage CheckAddress(string url)
-        {
-            using (var client = new HttpClient())
-            {
-                return client.GetAsync(url).Result;
-            }
-        }
-
-        private static void CreateCertificate(string domainName, string pfxPath, string password)
-        {
-            string args = string.Format(@".\createCert.ps1 -pfxFileName {0} -pfxPassword ""{1}"" -domainName ""{2}""", pfxPath, password, domainName);
-            ProcessStartInfo info = new ProcessStartInfo("powershell", args);
-            info.WorkingDirectory = "Asset";
-            Process.Start(info).WaitForExit();
         }
     }
 }
