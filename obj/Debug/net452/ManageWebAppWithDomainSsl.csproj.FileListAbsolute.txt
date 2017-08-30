@@ -1,0 +1,4 @@
+C:\Sources\dotnet-samples\app-service-dotnet-manage-web-apps-with-custom-domains\bin\Debug\net452\ManageWebAppWithDomainSsl.runtimeconfig.json
+C:\Sources\dotnet-samples\app-service-dotnet-manage-web-apps-with-custom-domains\bin\Debug\net452\ManageWebAppWithDomainSsl.runtimeconfig.dev.json
+C:\Sources\dotnet-samples\app-service-dotnet-manage-web-apps-with-custom-domains\obj\Debug\net452\ManageWebAppWithDomainSsl.csproj.ManageWebAppWithDomainSsl.exe.config
+C:\Sources\dotnet-samples\app-service-dotnet-manage-web-apps-with-custom-domains\obj\Debug\net452\ManageWebAppWithDomainSsl.csproj.CoreCompileInputs.cache
