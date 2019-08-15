@@ -4,21 +4,21 @@ languages:
 - csharp
 products:
 - azure
-services: App-Service
-platforms: dotnet
-author: yaohaizh
+extensions:
+- services: App-Service
+- platforms: dotnet
 ---
 
 # Getting started on managing Web Apps with custom domains in C# #
 
-          Azure App Service sample for managing web apps.
-           - app service plan, web app
-             - Create 2 web apps under the same new app service plan
-           - domain
-             - Create a domain
-           - certificate
-             - Upload a self-signed wildcard certificate
-             - update both web apps to use the domain and the created wildcard SSL certificate
+ Azure App Service sample for managing web apps.
+  - app service plan, web app
+    - Create 2 web apps under the same new app service plan
+  - domain
+    - Create a domain
+  - certificate
+    - Upload a self-signed wildcard certificate
+    - update both web apps to use the domain and the created wildcard SSL certificate
 
 
 ## Running this Sample ##
