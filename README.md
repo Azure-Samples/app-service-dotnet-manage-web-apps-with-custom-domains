@@ -5,8 +5,8 @@ languages:
 products:
 - azure
 extensions:
-- services: App-Service
-- platforms: dotnet
+  services: App-Service
+  platforms: dotnet
 ---
 
 # Getting started on managing Web Apps with custom domains in C# #
