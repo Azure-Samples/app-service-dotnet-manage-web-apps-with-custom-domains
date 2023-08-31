@@ -1,15 +1,19 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using Microsoft.Azure.Management.AppService.Fluent;
-using Microsoft.Azure.Management.AppService.Fluent.Models;
-using Microsoft.Azure.Management.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
-using Microsoft.Azure.Management.Samples.Common;
+using Azure;
+using Azure.Core;
+using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.ResourceManager.AppService;
+using Azure.ResourceManager.AppService.Models;
+using Azure.ResourceManager.Resources;
+using Azure.ResourceManager.Samples.Common;
+using Azure.ResourceManager.Sql;
+using Azure.ResourceManager.Sql.Models;
 using System;
 using System.IO;
-using System.Net.Http;
+using System.Threading;
 
 namespace ManageWebAppWithDomainSsl
 {
@@ -27,12 +31,17 @@ namespace ManageWebAppWithDomainSsl
          *    - Upload a self-signed wildcard certificate
          *    - update both web apps to use the domain and the created wildcard SSL certificate
          */
-        public static void RunSample(IAzure azure)
+        public static async Task RunSample(ArmClient client)
         {
-            string app1Name = SdkContext.RandomResourceName("webapp1-", 20);
-            string app2Name = SdkContext.RandomResourceName("webapp2-", 20);
-            string rgName = SdkContext.RandomResourceName("rgNEMV_", 24);
-            string domainName = SdkContext.RandomResourceName("jsdkdemo-", 20) + ".com";
+            AzureLocation region = AzureLocation.EastUS;
+            string websiteName = Utilities.CreateRandomName("website-");
+            string planName = Utilities.CreateRandomName("plan-");
+            string app1Name = Utilities.CreateRandomName("webapp1-");
+            string app2Name = Utilities.CreateRandomName("webapp2-");
+            string rgName = Utilities.CreateRandomName("rgNEMV_");
+            string domainName = Utilities.CreateRandomName("jsdkdemo-") + ".com";
+            var lro = await client.GetDefaultSubscription().GetResourceGroups().CreateOrUpdateAsync(Azure.WaitUntil.Completed, rgName, new ResourceGroupData(AzureLocation.EastUS));
+            var resourceGroup = lro.Value;
 
             try
             {
@@ -41,53 +50,59 @@ namespace ManageWebAppWithDomainSsl
 
                 Utilities.Log("Creating web app " + app1Name + "...");
 
-                var app1 = azure.WebApps
-                        .Define(app1Name)
-                        .WithRegion(Region.USWest)
-                        .WithNewResourceGroup(rgName)
-                        .WithNewWindowsPlan(PricingTier.StandardS1)
-                        .Create();
+                var webSite1Collection = resourceGroup.GetWebSites();
+                var webSite1Data = new WebSiteData(region)
+                {
+                    SiteConfig = new Azure.ResourceManager.AppService.Models.SiteConfigProperties()
+                    {
+                        WindowsFxVersion = "PricingTier.StandardS1",
+                        NetFrameworkVersion = "NetFrameworkVersion.V4_6",
+                    }
+                };
+                var webSite1_lro = await webSite1Collection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, app1Name, webSite1Data);
+                var webSite1 = webSite1_lro.Value;
 
-                Utilities.Log("Created web app " + app1.Name);
-                Utilities.Print(app1);
+                Utilities.Log("Created web app " + webSite1.Data.Name);
+                Utilities.Print(webSite1);
 
                 //============================================================
                 // Create a second web app with the same app service plan
 
                 Utilities.Log("Creating another web app " + app2Name + "...");
-                var plan = azure.AppServices.AppServicePlans.GetById(app1.AppServicePlanId);
-                var app2 = azure.WebApps
-                        .Define(app2Name)
-                        .WithExistingWindowsPlan(plan)
-                        .WithExistingResourceGroup(rgName)
-                        .Create();
+                var plan = webSite1.Data.AppServicePlanId;
+                var webSite2Collection = resourceGroup.GetWebSites();
+                var webSite2Data = new WebSiteData(region)
+                {
+                    SiteConfig = new Azure.ResourceManager.AppService.Models.SiteConfigProperties()
+                    {
+                        WindowsFxVersion = "PricingTier.StandardS1",
+                        NetFrameworkVersion = "NetFrameworkVersion.V4_6",
+                    }
+                };
+                var webSite2_lro = await webSite2Collection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, websiteName, webSite2Data);
+                var webSite2 = webSite2_lro.Value;
 
-                Utilities.Log("Created web app " + app2.Name);
-                Utilities.Print(app2);
+                Utilities.Log("Created web app " + webSite2.Data.Name);
+                Utilities.Print(webSite2);
 
                 //============================================================
                 // Purchase a domain (will be canceled for a full refund)
 
                 Utilities.Log("Purchasing a domain " + domainName + "...");
 
-                var domain = azure.AppServices.AppServiceDomains.Define(domainName)
-                        .WithExistingResourceGroup(rgName)
-                        .DefineRegistrantContact()
-                            .WithFirstName("Jon")
-                            .WithLastName("Doe")
-                            .WithEmail("jondoe@contoso.com")
-                            .WithAddressLine1("123 4th Ave")
-                            .WithCity("Redmond")
-                            .WithStateOrProvince("WA")
-                            .WithCountry(CountryISOCode.UnitedStates)
-                            .WithPostalCode("98052")
-                            .WithPhoneCountryCode(CountryPhoneCode.UnitedStates)
-                            .WithPhoneNumber("4258828080")
-                            .Attach()
-                        .WithDomainPrivacyEnabled(true)
-                        .WithAutoRenewEnabled(false)
-                        .Create();
-                Utilities.Log("Purchased domain " + domain.Name);
+                var domainCollection = resourceGroup.GetAppServiceDomains();
+                var domainData = new AppServiceDomainData(region)
+                {
+                    ContactRegistrant = new RegistrationContactInfo("jondoe@contoso.com", "Jon", "Doe", "4258828080")
+                    {
+                        AddressMailing = new RegistrationAddressInfo("123 4th Ave", "Redmond", "UnitedStates", "98052", "WA")
+                    },
+                    IsDomainPrivacyEnabled = true,
+                    IsAutoRenew = false
+                };
+                var domain_lro = domainCollection.CreateOrUpdate(WaitUntil.Completed, domainName, domainData);
+                var domain = domain_lro.Value;
+                Utilities.Log("Purchased domain " + domain.Data.Name);
                 Utilities.Print(domain);
 
                 //============================================================
@@ -95,16 +110,17 @@ namespace ManageWebAppWithDomainSsl
 
                 Utilities.Log("Binding http://" + app1Name + "." + domainName + " to web app " + app1Name + "...");
 
-                app1 = app1.Update()
-                        .DefineHostnameBinding()
-                            .WithAzureManagedDomain(domain)
-                            .WithSubDomain(app1Name)
-                            .WithDnsRecordType(CustomHostNameDnsRecordType.CName)
-                            .Attach()
-                        .Apply();
+                var bindingsCollection = webSite1.GetSiteHostNameBindings();
+                var bindingsdata = new HostNameBindingData()
+                {
+                    DomainId = domain.Id,
+                    CustomHostNameDnsRecordType = CustomHostNameDnsRecordType.CName,
+                };
+                var bindings_lro = bindingsCollection.CreateOrUpdate(WaitUntil.Completed, Utilities.CreateRandomName("bindings-"), bindingsdata);
+                var bindings = bindings_lro.Value;
 
                 Utilities.Log("Finished binding http://" + app1Name + "." + domainName + " to web app " + app1Name);
-                Utilities.Print(app1);
+                Utilities.Print(bindings);
 
                 //============================================================
                 // Create a self-singed SSL certificate
@@ -122,38 +138,41 @@ namespace ManageWebAppWithDomainSsl
 
                 Utilities.Log("Binding https://" + app1Name + "." + domainName + " to web app " + app1Name + "...");
 
-                app1 = app1.Update()
-                                .WithManagedHostnameBindings(domain, app1Name)
-                                .DefineSslBinding()
-                                    .ForHostname(app1Name + "." + domainName)
-                                    .WithPfxCertificateToUpload(Path.Combine(Utilities.ProjectPath, "Asset", pfxPath), CertificatePassword)
-                                    .WithSniBasedSsl()
-                                    .Attach()
-                                .Apply();
+                var bindingsCollection1 = webSite1.GetSiteHostNameBindings();
+                var bindingsdata1 = new HostNameBindingData()
+                {
+                    DomainId = domain.Id,
+                    CustomHostNameDnsRecordType = CustomHostNameDnsRecordType.CName,
+                    SslState = HostNameBindingSslState.SniEnabled
+                };
+                var bindings_lro1 = bindingsCollection.CreateOrUpdate(WaitUntil.Completed, Utilities.CreateRandomName("bindings-"), bindingsdata1);
+                var bindings1 = bindings_lro.Value;
 
-                Utilities.Log("Finished binding https://" + app1Name + "." + domainName + " to web app " + app1Name);
-                Utilities.Print(app1);
+                Utilities.Log("Finished binding http://" + app1Name + "." + domainName + " to web app " + app1Name);
+                Utilities.Print(bindings1);
 
                 Utilities.Log("Binding https://" + app2Name + "." + domainName + " to web app " + app2Name + "...");
 
-                app2 = app2.Update()
-                                .WithManagedHostnameBindings(domain, app2Name)
-                                .DefineSslBinding()
-                                    .ForHostname(app2Name + "." + domainName)
-                                    .WithPfxCertificateToUpload(Path.Combine(Utilities.ProjectPath, "Asset", pfxPath), CertificatePassword)
-                                    .WithSniBasedSsl()
-                                    .Attach()
-                                .Apply();
+                var bindingsCollection2 = webSite2.GetSiteHostNameBindings();
+                var bindingsdata2 = new HostNameBindingData()
+                {
+                    DomainId = domain.Id,
+                    CustomHostNameDnsRecordType = CustomHostNameDnsRecordType.CName,
+                    SslState = HostNameBindingSslState.SniEnabled,
 
-                Utilities.Log("Finished binding https://" + app2Name + "." + domainName + " to web app " + app2Name);
-                Utilities.Print(app2);
+                };
+                var bindings_lro2 = bindingsCollection.CreateOrUpdate(WaitUntil.Completed, Utilities.CreateRandomName("bindings-"), bindingsdata2);
+                var bindings2 = bindings_lro.Value;
+
+                Utilities.Log("Finished binding http://" + app2Name + "." + domainName + " to web app " + app2Name);
+                Utilities.Print(bindings2);
             }
             finally
             {
                 try
                 {
                     Utilities.Log("Deleting Resource Group: " + rgName);
-                    azure.ResourceGroups.DeleteByName(rgName);
+                    await resourceGroup.DeleteAsync(WaitUntil.Completed);
                     Utilities.Log("Deleted Resource Group: " + rgName);
                 }
                 catch (NullReferenceException)
@@ -167,24 +186,23 @@ namespace ManageWebAppWithDomainSsl
             }
         }
 
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             try
             {
                 //=================================================================
                 // Authenticate
-                var credentials = SdkContext.AzureCredentialsFactory.FromFile(Environment.GetEnvironmentVariable("AZURE_AUTH_LOCATION"));
-
-                var azure = Azure
-                    .Configure()
-                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-                    .Authenticate(credentials)
-                    .WithDefaultSubscription();
+                var clientId = Environment.GetEnvironmentVariable("CLIENT_ID");
+                var clientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET");
+                var tenantId = Environment.GetEnvironmentVariable("TENANT_ID");
+                var subscription = Environment.GetEnvironmentVariable("SUBSCRIPTION_ID");
+                ClientSecretCredential credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+                ArmClient client = new ArmClient(credential, subscription);
 
                 // Print selected subscription
-                Utilities.Log("Selected subscription: " + azure.SubscriptionId);
+                Utilities.Log("Selected subscription: " + client.GetSubscriptions().Id);
 
-                RunSample(azure);
+                await RunSample(client);
             }
             catch (Exception e)
             {
